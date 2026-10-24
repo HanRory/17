@@ -128,6 +128,12 @@ footer button{border:0;background:none;text-decoration:underline;color:var(--sof
 .sa .btn{font-size:14px;padding:6px 12px;text-decoration:none}
 #toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:#fff;padding:8px 16px;border-radius:999px;z-index:50;font-size:14px;opacity:0;transition:opacity .2s;pointer-events:none}
 #toast.on{opacity:1}
+.ed{border:0;background:none;font-size:16px;padding:0 4px;opacity:.6}
+.sync{margin-top:14px;background:var(--card);border:2px solid var(--ink);border-radius:16px 20px 16px 20px;padding:10px 12px;font-size:14px}
+.sync[hidden]{display:none}
+.sync ol{margin:6px 0 0;padding-left:20px;color:var(--soft);font-size:13px}
+.sync .row2{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+body.ro .add,body.ro .star,body.ro .more,body.ro .grip,body.ro .todo li,body.ro #stayL textarea,body.ro #reset,body.ro #edT{pointer-events:none;opacity:.55}
 </style>
 </head>
 <body>
@@ -168,11 +174,16 @@ footer button{border:0;background:none;text-decoration:underline;color:var(--sof
 <g class="bob"><rect x="84" y="190" width="8" height="14" rx="3" fill="#ffe29a"/><path d="M96 214V221M104 214V221" fill="none"/><path d="M89 214L92 189H108L111 214Z" fill="#f6c1c8"/><path d="M92 188H108V193H92Z" fill="#e8765e"/><circle cx="100" cy="177" r="11" fill="#ffe3c9"/><path d="M88.5 178Q88 164 100 164Q112 164 111.5 178Q108 170 100 170Q92 170 88.5 178Z" fill="#5b4636"/><g stroke="none" fill="#5b4636"><circle cx="96" cy="179" r="1.4"/><circle cx="104" cy="179" r="1.4"/><circle cx="92.5" cy="182" r="2" fill="#f6a6a6"/><circle cx="107.5" cy="182" r="2" fill="#f6a6a6"/></g><g class="wave"><path d="M110 192L121 181" fill="none" stroke-width="6"/><path d="M110 192L121 181" fill="none" stroke="#f6c1c8" stroke-width="2.5"/><circle cx="122" cy="180" r="3.2" fill="#ffe3c9"/></g></g>
 </svg>
 <div class="cap">
-<h1>名古屋 9 日繪本旅行</h1>
+<h1><span id="heroT">名古屋 9 日繪本旅行</span><button class="ed" id="edT" aria-label="修改標題">✏️</button></h1>
 <p>2026/12/17（四）– 12/25（五）</p>
 <div class="cd" aria-live="off"><div><b id="cD">--</b><small>天</small></div><div><b id="cH">--</b><small>時</small></div><div><b id="cM">--</b><small>分</small></div><div><b id="cS">--</b><small>秒</small></div></div>
 <div id="cdMsg"></div>
 </div>
+</div>
+
+<div class="sync" id="sync" hidden>
+<div class="row2"><div id="gbtn"></div><span id="syncMsg">請登入 Google 帳號以取得編輯資格</span><button class="btn" id="outB" style="font-size:13px;padding:4px 10px">登出</button></div>
+<ol id="queue"></ol>
 </div>
 
 <section id="plan">
@@ -212,6 +223,7 @@ footer button{border:0;background:none;text-decoration:underline;color:var(--sof
 <div id="toast" role="status"></div>
 <script>
 const K='nagoya-trip-v1';
+const SYNC={url:'步驟4的/exec網址',clientId:'步驟2的用戶端ID'}; // ← 部署 Apps Script 後，填入網頁應用程式網址與 OAuth 用戶端 ID（留空則為單機模式）
 const MUST=new Set(['名古屋城','熱田神宮','犬山城 門票販售處','白川鄉合掌造聚落','飛驒老街','大須商店街','TOYOTA產業技術紀念館','白鳥庭園','名花之里','常滑招財貓通','Sky Promenade']);
 const RAW=[
 ['12/17','四','抵達名古屋',[['8:00','Brot yanagi'],['9:00','カネ井青果 セントラルパーク店'],['15:35','中部國際機場(新特麗亞)'],['17:30','金山站北口'],['17:54','2-chōme-6-20 Iseyama'],['19:12','綠洲21'],['20:28','樂比亞 千種店'],['21:28','矢場丼 LACHIC店'],['22:45','金山站北口']]],
@@ -229,14 +241,20 @@ const STAY=[
 {n:'2-chōme-6-20 Iseyama',d:'12/17 – 12/21（4 晚）',a:'2-chōme-6-20 Iseyama, Nagoya'},
 {n:'名古屋新幹線口 舒適酒店',d:'12/21 – 12/25（4 晚）',a:'名古屋新幹線口 舒適酒店'}
 ];
-const mk=()=>({mode:'walk',days:RAW.map(r=>({p:r[3].map(x=>({n:x[1],m:MUST.has(x[1])})),t:r[3].map(x=>x[0])})),todo:TODO0.map(t=>({t,c:false})),notes:['','']});
+const mk=()=>({mode:'walk',days:RAW.map(r=>({p:r[3].map(x=>({n:x[1],m:MUST.has(x[1])})),t:r[3].map(x=>x[0])})),todo:TODO0.map(t=>({t,c:false})),notes:['',''],title:''});
 let S;try{S=JSON.parse(localStorage.getItem(K));if(!S||S.days.length!==RAW.length)S=mk()}catch(e){S=mk()}
 S.mode=S.mode||'walk';S.days.forEach((d,i)=>{if(!d.t||d.t.length!==d.p.length)d.t=d.p.map((_,j)=>(RAW[i][3][j]||[])[0]||'—')});
-const save=()=>{try{localStorage.setItem(K,JSON.stringify(S))}catch(e){}};
+const save=()=>{try{localStorage.setItem(K,JSON.stringify(S))}catch(e){}push()};
 const $=id=>document.getElementById(id);
 const esc=s=>s.replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const mapUrl=n=>'https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(n+' 名古屋');
 const isHome=n=>n.startsWith('2-chōme')||n.includes('舒適酒店');
+
+/* 首頁標題可自行修改 */
+const DEF_T='名古屋 9 日繪本旅行';
+function applyTitle(){const t=S.title||DEF_T;$('heroT').textContent=t;document.title=t}
+$('edT').onclick=$('heroT').onclick=()=>{const v=prompt('輸入首頁標題（留空＝還原預設）',S.title||DEF_T);if(v===null)return;S.title=v.trim().slice(0,40);if(S.title===DEF_T)S.title='';save();applyTitle()};
+applyTitle();
 
 /* 倒數 */
 const T0=new Date('2026-12-17T08:00:00+09:00'),T1=new Date('2026-12-26T00:00:00+09:00');
@@ -266,7 +284,7 @@ $('tl').addEventListener('contextmenu',e=>e.preventDefault());
 /* 長按拖曳排序 */
 const tl=$('tl');let timer=null,drag=null,sx=0,sy=0,py=0,raf=0;
 tl.addEventListener('pointerdown',e=>{
- const row=e.target.closest('.row');if(!row||e.target.closest('.star,.more'))return;
+ if(document.body.classList.contains('ro'))return;const row=e.target.closest('.row');if(!row||e.target.closest('.star,.more'))return;
  sx=e.clientX;sy=e.clientY;py=e.clientY;const pid=e.pointerId;
  const go=()=>{drag=row;row.classList.add('lift');document.body.classList.add('dragging');try{tl.setPointerCapture(pid)}catch(_){}if(navigator.vibrate)navigator.vibrate(15);loop()};
  if(e.target.closest('.grip'))go();else timer=setTimeout(go,350);
@@ -312,7 +330,7 @@ $('stayL').innerHTML=STAY.map((s,i)=>'<div class="lodge"><div class="top">'+hous
 $('stayL').addEventListener('input',e=>{if(e.target.dataset.note!==undefined){S.notes[+e.target.dataset.note]=e.target.value;save()}});
 $('stayL').addEventListener('click',e=>{const b=e.target.closest('[data-copy]');if(!b)return;const t=STAY[+b.dataset.copy].n;(navigator.clipboard?navigator.clipboard.writeText(t):Promise.reject()).then(()=>{b.textContent='已複製 ✓'},()=>{b.textContent='請手動複製'});setTimeout(()=>b.textContent='複製名稱',1500)});
 
-$('reset').onclick=()=>{if(confirm('要還原預設的行程順序、必去標記與待辦清單嗎？（住宿備註會保留）')){const n=S.notes;S=mk();S.notes=n;save();renderDay();renderTodo()}};
+$('reset').onclick=()=>{if(confirm('要還原預設的行程順序、必去標記與待辦清單嗎？（住宿備註會保留）')){const n=S.notes,ti=S.title;S=mk();S.notes=n;S.title=ti;save();renderDay();renderTodo()}};
 
 /* ===== 新增功能 ===== */
 const REG=['名古屋','名古屋','名古屋','名古屋','名古屋','岐阜','三重','名古屋','愛知'];
@@ -392,6 +410,51 @@ $('sheet').addEventListener('click',e=>{const b=e.target.closest('[data-k]');if(
 $('shDel').onclick=()=>{const d=S.days[cur];d.p.splice(sel,1);d.t.splice(sel,1);save();closeS();renderDay();toast('已移除')};
 $('shTime').onclick=()=>{const v=prompt('輸入時間，例如 14:30',S.days[cur].t[sel]);if(v&&/^\d{1,2}:\d{2}$/.test(v.trim())){S.days[cur].t[sel]=v.trim();save();closeS();renderDay()}};
 renderDay();renderTodo();
+
+/* ===== Google 共編：登入先後 = 修改優先權 ===== */
+let sid=sessionStorage.getItem('sid')||'',canEdit=true,ver=0,pushT=0,pingT=0;
+const api=async o=>(await fetch(SYNC.url,{method:'POST',body:JSON.stringify({sid,v:ver,...o})})).json();
+const setRO=ro=>{canEdit=!ro;document.body.classList.toggle('ro',ro)};
+function push(){
+ if(!SYNC.url||!sid||!canEdit)return;
+ clearTimeout(pushT);
+ pushT=setTimeout(async()=>{pushT=0;try{const r=await api({a:'save',data:S});if(r.err==='readonly')ping();else if(r.ver!==undefined)ver=r.ver}catch(e){}},800);
+}
+function applyRemote(d){
+ if(!d||!d.days||d.days.length!==RAW.length)return;
+ S=d;S.mode=S.mode||'walk';S.notes=S.notes||['',''];S.title=S.title||'';
+ try{localStorage.setItem(K,JSON.stringify(S))}catch(e){}
+ applyTitle();renderDay();renderTodo();
+ document.querySelectorAll('#stayL textarea').forEach(t=>t.value=S.notes[+t.dataset.note]||'');
+}
+function showState(r){
+ $('syncMsg').textContent=r.edit?'✏️ 你目前擁有修改權':'🔒 唯讀中：'+r.holder+' 擁有優先修改權';
+ $('queue').innerHTML=r.queue.map((q,i)=>'<li>'+esc(q.email)+'（登入 '+q.at+'）'+(i===0?' ✏️ 修改中':'')+'</li>').join('');
+ setRO(!r.edit);
+ if(r.data&&!pushT){ver=r.ver;applyRemote(r.data)}else if(r.ver!==undefined&&!pushT)ver=r.ver;
+ if(r.edit&&!r.ver)push();
+}
+async function ping(){
+ if(!sid)return;
+ try{const r=await api({a:'ping'});
+  if(r.err){sid='';sessionStorage.removeItem('sid');clearInterval(pingT);setRO(true);$('syncMsg').textContent=r.err==='expired'?'登入已逾時，請重新登入':'❌ '+r.err;return}
+  showState(r)}catch(e){$('syncMsg').textContent='連線中斷，重試中…'}
+}
+async function onCred(resp){
+ $('syncMsg').textContent='驗證中…';
+ try{const r=await api({a:'login',cred:resp.credential,v:0});
+  if(r.err){$('syncMsg').textContent='❌ '+r.err;return}
+  sid=r.sid;sessionStorage.setItem('sid',sid);showState(r);clearInterval(pingT);pingT=setInterval(ping,15000)}
+ catch(e){$('syncMsg').textContent='❌ 無法連線到伺服器'}
+}
+if(SYNC.url){
+ $('sync').hidden=false;setRO(true);
+ const g=document.createElement('script');g.src='https://accounts.google.com/gsi/client';
+ g.onload=()=>{google.accounts.id.initialize({client_id:SYNC.clientId,callback:onCred});google.accounts.id.renderButton($('gbtn'),{theme:'outline',size:'medium',locale:'zh-TW'})};
+ document.head.appendChild(g);
+ if(sid){ver=0;ping();pingT=setInterval(ping,15000)}
+ $('outB').onclick=async()=>{try{await api({a:'logout'})}catch(e){}sid='';sessionStorage.removeItem('sid');clearInterval(pingT);setRO(true);$('queue').innerHTML='';$('syncMsg').textContent='已登出，修改權已讓出'};
+}else $('outB').hidden=true;
 </script>
 </body>
 </html>
